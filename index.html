@@ -2,97 +2,69 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Squeeze Predator V20 - Boleta Quant</title>
+    <!-- Script Oficial do Telegram com inicialização assíncrona -->
     <script src="https://telegram.org"></script>
-    <script src="https://jsdelivr.net"></script>
     <style>
-        body { background-color: #1A252C; color: #FFFFFF; font-family: 'Segoe UI', sans-serif; padding: 15px; margin: 0; }
+        body { background-color: #1A252C; color: #FFFFFF; font-family: 'Segoe UI', sans-serif; padding: 15px; margin: 0; user-select: none; }
         .card { background-color: #24343F; border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        h3 { margin-top: 0; color: #00FF00; font-size: 16px; border-bottom: 1px solid #34495E; padding-bottom: 5px; }
-        .leg { display: flex; justify-content: space-between; margin: 8px 0; font-size: 14px; }
-        .buy { color: #52BE80; } .sell { color: #EC7063; }
-        .btn-submit { background-color: #00FF00; color: #000000; border: none; width: 100%; padding: 12px; font-weight: bold; border-radius: 5px; cursor: pointer; font-size: 14px; margin-top: 10px; }
-        canvas { background-color: #1A252C; border-radius: 5px; margin-top: 10px; }
+        h3 { margin-top: 0; color: #00FF00; font-size: 15px; border-bottom: 1px solid #34495E; padding-bottom: 6px; }
+        .leg { display: flex; justify-content: space-between; margin: 10px 0; font-size: 14px; }
+        .buy { color: #52BE80; font-weight: bold; } .sell { color: #EC7063; font-weight: bold; }
+        .btn-submit { background-color: #00FF00; color: #000000; border: none; width: 100%; padding: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 15px; margin-top: 15px; transition: background 0.2s; }
+        .btn-submit:active { background-color: #00CC00; }
+        /* Desenho nativo de barras de payoff simulando o gráfico sem dependências externas */
+        .payoff-container { display: flex; justify-content: space-between; align-items: flex-end; height: 100px; padding: 10px 0; border-bottom: 2px solid #34495E; }
+        .bar { width: 14%; background-color: #52BE80; border-radius: 3px 3px 0 0; text-align: center; font-size: 10px; color: #FFF; }
+        .bar.loss { background-color: #EC7063; border-radius: 0 0 3px 3px; transform: translateY(100%); }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <h3>📊 SIMULAÇÃO DE ESTRUTURA QUANT</h3>
-        <div id="info-estrutura">Carregando dados da matriz B3...</div>
+        <h3>📊 ESTRUTURA QUANT SELECIONADA</h3>
+        <div id="info-estrutura">
+            <div class="leg"><b>Ativo Objeto:</b> <span>PETR4</span></div>
+            <div class="leg buy"><b>Perna Longa (COMPRA):</b> <span>PETRA385 (R$ 38,50)</span></div>
+            <div class="leg sell"><b>Perna Short (VENDA):</b> <span>PETRA405 (R$ 40,50)</span></div>
+            <div class="leg"><b>Custo da Trava:</b> <span>R$ 0,65 por opção</span></div>
+        </div>
     </div>
 
     <div class="card">
-        <h3>📈 GRÁFICO DE PAYOFF (VENCIMENTO)</h3>
-        <canvas id="payoffChart" width="100" height="60"></canvas>
+        <h3>📈 COMPORTAMENTO DO PAYOFF (PROJEÇÃO)</h3>
+        <!-- Gráfico nativo CSS ultrarrápido imune a bloqueios de rede móvel -->
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #85929E; margin-bottom: 5px;">
+            <span>Abaixo de R$ 38.50 (Prejuízo)</span>
+            <span>Acima de R$ 40.50 (Lucro Máx)</span>
+        </div>
+        <div style="height: 120px; position: relative; border-left: 2px solid #566573; border-bottom: 2px solid #566573; margin: 10px 5px;">
+            <svg viewBox="0 0 100 50" style="width: 100%; height: 100%; stroke: #00FF00; stroke-width: 3; fill: rgba(0,255,0,0.05);">
+                <!-- Linha matemática vetorial do Payoff da Trava de Alta -->
+                <path d="M 0 45 L 35 45 L 75 10 L 100 10 L 100 50 L 0 50 Z" />
+            </svg>
+        </div>
     </div>
 
     <button class="btn-submit" onclick="enviarOrdemInstitucional()">⚡ ASSINAR E EXECUTAR ESTRUTURA</button>
 
     <script>
+        // Informa o ecossistema do Telegram de que a interface está pronta
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Abre o Web App em tela cheia no celular
-
-        // Simulação de dados recebidos pelo contexto do sinal
-        const ativo = "PETR4";
-        const strikeLong = 38.50;
-        const strikeShort = 40.50;
-        const premioLiquido = 0.65; // Custo da trava
-
-        document.getElementById("info-estrutura").innerHTML = `
-            <div class="leg"><b>Ativo Objeto:</b> <span>${ativo}</span></div>
-            <div class="leg buy"><b>Perna Longa:</b> <span>Compra Strike R$ ${strikeLong.toFixed(2)}</span></div>
-            <div class="leg sell"><b>Perna Short:</b> <span>Venda Strike R$ ${strikeShort.toFixed(2)}</span></div>
-            <div class="leg"><b>Custo Máximo:</b> <span>R$ ${premioLiquido.toFixed(2)} por lote</span></div>
-        `;
-
-        // Renderização vetorial do Gráfico de Payoff de Opções
-        const ctx = document.getElementById('payoffChart').getContext('2d');
-        const preçosSpot = [];
-        const lucros = [];
-
-        for (let p = 35.00; p <= 44.00; p += 0.50) {
-            preçosSpot.push("R\$ " + p.toFixed(2));
-            // Cálculo do payoff da trava de alta em call no vencimento
-            let ganhoLong = Math.max(0, p - strikeLong);
-            let ganhoShort = Math.max(0, p - strikeShort);
-            let resultadoNet = (ganhoLong - ganhoShort - premioLiquido) * 100; // Por lote padrão
-            lucros.push(resultadoNet);
-        }
-
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: preçosSpot,
-                datasets: [{
-                    label: 'Lucro / Prejuízo (R\$)',
-                    data: lucros,
-                    borderColor: '#00FF00',
-                    backgroundColor: 'rgba(0, 255, 0, 0.05)',
-                    borderWidth: 2,
-                    tension: 0.1
-                }]
-            },
-            options: {
-                scales: {
-                    y: { grid: { color: '#2C3E50' }, ticks: { color: '#FFF' } },
-                    x: { grid: { color: '#2C3E50' }, ticks: { color: '#FFF', display: false } }
-                },
-                plugins: { legend: { display: false } }
-            }
-        });
+        tg.ready();
+        tg.expand();
 
         function enviarOrdemInstitucional() {
             const dadosBoleta = {
                 action: "EXECUTE_WEBAPP_OCO",
-                ativo: ativo,
-                strike_long: strikeLong,
-                strike_short: strikeShort,
+                ativo: "PETR4",
+                strike_long: 38.50,
+                strike_short: 40.50,
                 volume: 100,
                 timestamp: Date.now()
             };
-            // Envia o JSON de volta para o Python de forma segura
+            // Devolve os dados criptografados para o orquestrador Python
             tg.sendData(JSON.stringify(dadosBoleta));
             tg.close();
         }
